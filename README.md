@@ -9,10 +9,11 @@ This is the first and only *individual* (as opposed to *team*) this semester.
 
 Term: Spring 2019
 
-+ Projec title: Lorem ipsum dolor sit amet
-+ This project is conducted by [your name]
++ Projec title: Exploration of Happiness
++ This project is conducted by [Feng Su]
 
-+ Project summary: [a short summary] Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.
++ Project summary: [a short summary] In this specific project, I mainly applied statistical analysis, texting mining techniques and NLP to drive insights form the this happy moment database. For example, What can make people feel happy? Are there any difference between different kind of people? Can we use specific words to predict features of individuals? 
+The answers for the above three questions are "Yes"! In addition, I further investigate the correlation between different words and drive some really interesting insigts on a spcific word.
 
 Following [suggestions](http://nicercode.github.io/blog/2013-04-05-projects/) by [RICH FITZJOHN](http://nicercode.github.io/about/#Team) (@richfitz). This folder is orgarnized as follows.
 
