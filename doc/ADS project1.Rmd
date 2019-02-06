@@ -1,0 +1,488 @@
+---
+title: "R Notebook"
+output: html_notebook
+#output:
+#  html_document:
+#    df_print: paged
+---
+
+```{r}
+library("tm")
+library("SnowballC")
+library("wordcloud")
+library("RColorBrewer")
+library(ggplot2)
+library(udpipe)
+library(textrank)
+library(lattice)
+library(igraph)
+library(ggraph)
+library(tidytext)
+library(text2vec)
+library(data.table)
+library(magrittr)
+library(glmnet)
+library(dplyr)
+library(ngram)
+library("imager")
+```
+#Applied Data Science Project 1: HappyDB
+## Feng Su, UNI=fs2658 
+###0,Introduction
+####What makes you happy?  
+```{r}
+im=load.image("C:/Users/Alienware/Desktop/image/1.png")
+plot(im,axes=FALSE)
+```
+
+¡°The purpose of our lives is to be happy.¡±¡ªDalai Lama.
+
+We all want to be happy and the reasons for making people happy can vary. And Scientists mainly conclude happiness into seven categories.
+
+1,¡±Friends¡± 
+
+2,¡±Success¡±
+
+3,¡±Marriage¡±
+
+4,¡±Experience¡±
+
+5,¡±Health¡±
+
+6,¡±Prosperity¡±
+
+7,¡±Religion¡±
+
+In fact, we have a happiness baseline, which is our general long-term happiness. Luckily, from scientific aspects, even though something bad happens, our ¡°brilliant¡± emotional system will help us to ¡°adapt¡± and eventually go back to normal. And this gives us new opportunities to feel happy again! 
+
+```{r}
+im=load.image("C:/Users/Alienware/Desktop/image/2.png")
+plot(im,axes=FALSE)
+```
+
+####Can happiness be quantified? 
+
+```{r}
+im=load.image("C:/Users/Alienware/Desktop/image/3.png")
+plot(im,axes=FALSE)
+```
+From the picture above, it looks like that happiness can be defined even from mathematical aspects. And this makes me feel really excited and I immediately ask myself some questions,
+
+¡°What kind of thing (people, activities ,¡­¡­) can trigger happiness in  most instance(with higher probabilities)?¡±
+
+¡°Does the combinations of this formula for happiness change when it applied different groups of people?¡±
+
+¡°Can we use ¡°happiness¡± in real-world business cases?¡±
+
+I cannot wait to dig into our database for happiness (HappyDB) and use data to solve these questions.
+
+###The purpose of this project:
+HappyDB is a corpus of 100,000 crowd-sourced happy moments. The purpose of this project is to look at multiple aspects of this dataset in order to drive useful information and gain deeper insights from the database.
+
+Let¡¯s firstly have a glance at the HappyDB:
+
+###1, General information
+####1.1, word count
+
+At the very beginning, let us obtain some general information from HappyDB, especially in cleaned_hm. In order to achieve this, I performed some statistical analysis base on some the number of words in every single happy moment.
+
+It looks like that the majority of happy moments are composed by 5 to 20 words roughly and the mean of sentence length is around 18 words. Some of the happy moment can even compose just two words. However, after I separate the happy moments into two groups based on different reflection_period (24 hours and 3hours). I found a really interesting phenomenon. The mean length of sentence for happy moments in 24 hours in actually smaller than the mean length of sentence for happy moments in 3 months. This surprised me because in my opinion, human memory towards some specific things will fade with time elapsing. So in this case, when people describe the happy moment in the past 3 months will be actually shorter than the one which just happened in the past 24 hours. However, later I actually found the ration behind this phenomenon. Indeed, human memory towards some specific things will fade with time elapsing. And when people try to describe things which they cannot remember clearly, they tend to use more descriptive words to make things more specific and this helped to explain the phenomenon.
+```{r}
+cleanedhm=read.csv("C:/Users/Alienware/Desktop/cleaned_hm.csv")
+#Please adjust the file to the local enviroment
+#Really sorry for the inconvenience
+```
+
+
+
+
+
+
+
+
+```{r}
+#General Information
+justcleanhm=cleanedhm[,5]
+justcleanhm=as.character(justcleanhm)
+counts=length(justcleanhm)# total number of data in the database
+totalwords=wordcount(justcleanhm)# total number of words in the database
+mean=totalwords/counts# mean length of the sentence
+justcleanhm2=cleanedhm[,5]
+justcleanhm2=as.matrix(justcleanhm2)
+stlen=apply(justcleanhm2,1,FUN=wordcount)
+maxlen=max(stlen)# maximum length of sentence
+minlen=min(stlen)# minimum length of sentence
+Dhm=as.character(cleanedhm[cleanedhm$reflection_period=="24h",5])
+Mhm=as.character(cleanedhm[cleanedhm$reflection_period=="3m",5])
+Dcounts=length(Dhm)# total number of data associated with "24h"
+Mcounts=length(Mhm)# total number of data associated with "3m"
+Dmean=wordcount(Dhm)/Dcounts# mean length of sentence associated with "24h"
+Mmean=wordcount(Mhm)/Mcounts# mean length of sentence associated with "3m"
+GeneralInf=rbind(counts,totalwords,mean,maxlen,minlen,Dcounts,Mcounts,Dmean,Mmean)
+colnames(GeneralInf)="GeneralInformation"
+GeneralInf
+lengthgroup=rbind(sum(ifelse(stlen<=5&stlen>=0,1,0)),
+sum(ifelse(stlen<=10&stlen>=5,1,0)),
+sum(ifelse(stlen<=15&stlen>10,1,0)),
+sum(ifelse(stlen<=20&stlen>15,1,0)),
+sum(ifelse(stlen<=25&stlen>20,1,0)),
+sum(ifelse(stlen<=30&stlen>25,1,0)),
+sum(ifelse(stlen<=35&stlen>30,1,0)),
+sum(ifelse(stlen<=40&stlen>35,1,0)),
+sum(ifelse(stlen<=45&stlen>40,1,0)),
+sum(ifelse(stlen<=50&stlen>45,1,0)),
+sum(ifelse(stlen>50,1,0)))
+# Summarize words counts in different interval and put them together
+name=c("0-5","5-10","10-15","15-20","20-25","25-30","30-35","35-40","40-45","45-50",">50")
+database=data.frame(name,lengthgroup)
+ggplot(data=database,aes(name,lengthgroup))+geom_bar(color="blue",stat = "identity",fill = "#FF6666")+labs(size= "Nitrogen",
+       x = "word numbers interval",
+       y = "My y labeltotal word numbers within in interval"
+       )
+
+```
+
+####1.2 word frequency
+
+Here, I reproduced my algorithm several time to clean out some highly repeated adjectives, prepositions, and adverbials. And I created a word cloud which includes some most mentioned words in HappyDB. I found out that ¡°Friend¡± is actually the most mentioned word in the word cloud I created and this coincides with the theory of scientists which I mentioned at the beginning of this report. And ¡°family¡±, ¡±son¡±, ¡±night¡±, ¡±home¡±, ¡±dog¡± also seems like the factors which make people feel happy.
+
+
+```{r}
+text1=as.character(justcleanhm)
+funp=function(text1,c){
+ff.all<-Corpus(VectorSource(text1))
+ff.all<-tm_map(ff.all, stripWhitespace)
+ff.all<-tm_map(ff.all, content_transformer(tolower))
+ff.all<-tm_map(ff.all, removeWords, stopwords("english"))
+ff.all<-tm_map(ff.all, removeWords, c("i", "we","us","them","her","him","day","went","today","made","saw","does","did","somthing","parts","realize","reflect","true","false","found","lot","thing","ing","still","get","veri","the","seen","no","playing","without","and","was","for","with","that","work","had","happy","when","and","they","have","make","got","see","yesterday","she","he","me","a","an","new","good","nice","one","favourite","new","able","really","finally","last","first","friend","time"))
+ff.all<-tm_map(ff.all, removeWords, character(0))
+ff.all<-tm_map(ff.all, removePunctuation)
+tdm.all<-TermDocumentMatrix(ff.all)
+tdm.tidy=tidy(tdm.all)
+tdm.overall=summarise(group_by(tdm.tidy, term), sum(count))
+return(wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(2,0.2),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=c))
+}
+funp(text1,c=brewer.pal(9,"Dark2"))
+# Function which can help us reproduce the wordcloud
+```
+
+###2,Depth analysis of some dimensions of data:
+
+After I completed the word cloud in the last section, I actually found out that noun ¡°moment¡± and verb ¡°bought¡± are highly mentioned. And this makes me interested at three specific questions for this HappyDB
+
+(1)    Which season is more likely to make people feel happy?
+
+(2)    which nouns are highly mentioned? Do they have any relation?  
+
+(2)    What product that can make people feel happy? 
+
+####2.1.1: The happiest season 
+The method I used here is to extracted key words which related to seasons in this specific database. And I found out that ¡°Summer¡± is actually most mentioned season among those happy moments. This is rational for myself because I¡¯m a summer and sea lover as well. And when I looked up on internet, I found that the scientific reasons behind this. During the summer time, the level of serotonin, a hormone which has been dubbed as the ¡° happiness hormone¡±, goes up when our skin absorbs UV light and this is the main reason why you feel energized and optimistic during the summer time! 
+
+
+```{r}
+words=strsplit(text1," ")
+words.freq=table(unlist(words))
+res=data.frame(cbind(names(words.freq),as.integer(words.freq)))
+SP1=as.matrix(res[res$X1=="Spring",])
+SP2=as.matrix(res[res$X1=="spring",])
+springtime=sum(as.numeric(SP1[1,2])+as.numeric(SP2[1,2]))
+S1=as.matrix(res[res$X1=="Summer",])
+S2=as.matrix(res[res$X1=="summer",])
+S3=as.matrix(res[res$X1=="SUMMER",])
+summertime=sum(as.numeric(S1[1,2])+as.numeric(S2[1,2])+as.numeric(S3[1,2]))
+F1=as.matrix(res[res$X1=="Fall",])
+falltime=as.numeric(F1[1,2])
+W1=as.matrix(res[res$X1=="Winter",])
+W2=as.matrix(res[res$X1=="winter",])
+wintertime=sum(as.numeric(W1[1,2])+as.numeric(W2[1,2]))
+season=c("Spring","Summer","Fall","Winter")
+totalcount=c(springtime,summertime,falltime,wintertime)
+mydata=data.frame(season,totalcount)
+ggplot(data=mydata,aes(season,totalcount))+geom_bar(stat = "identity",fill="darkolivegreen3",width=0.5)+ geom_point(size=4, shape=20,color="coral")
+
+```
+
+```{r}
+ud_model <- udpipe_download_model(language = "english")
+ud_model <- udpipe_load_model(ud_model$file_model)
+# This model can help us conclude the lemma and charateristic for every single word in the database
+```
+
+```{r}
+y=cleanedhm[1:10000,]
+x <- udpipe_annotate(ud_model, x = y$cleaned_hm)
+x=as.data.frame(x)
+# I applied this model to y, which is the first 10000 data of happy moments (This chunck of code does take some time to process for my own computer)
+
+```
+
+####2.1.2: Top 30 most occurring nouns and their Co-occurrences.
+
+(Due to the limitation imposed by the memory space of my computer, I only processed the first 10000 data for this part.)
+Not surprisingly, words such as ¡°friends¡±, ¡±dinner¡± are still at the top of the list which coincide with my word cloud for the whole data base. And I actually found out that those highly mentioned word are actually correlated, by which it means that, they normally do not appear along just like ¡°friends¡±, ¡±family¡±, ¡±dinner¡± in the Co-occurrance plot. In my personal opinion, these words represent different factors in the formula for the happiness which we talked about in the very beginning. This makes me believe that maybe with the help of larger database and more through analysis, we can actually generate happy feelings by ourselves.   
+
+
+```{r}
+stats <- subset(x, upos %in% "NOUN")
+stats <- txt_freq(x = stats$lemma)
+stats$key <- factor(stats$key, levels = rev(stats$key))
+barchart(key ~ freq, data = head(stats, 30), col = "cadetblue", main = "Most occurring nouns", xlab = "Freq")
+```
+
+```{r}
+stats <- cooccurrence(x = subset(x, upos %in% "NOUN"), 
+                     term = "lemma", group = c("doc_id", "paragraph_id", "sentence_id"))
+wordnetwork <- head(stats, 30)
+wordnetwork <- graph_from_data_frame(wordnetwork)
+ggraph(wordnetwork, layout = "fr") +
+  geom_edge_link(aes(width = cooc, edge_alpha = cooc), edge_colour = "pink") +
+  geom_node_text(aes(label = name), col = "darkgreen", size = 4) +
+  theme_graph(base_family = "Arial Narrow") +
+  theme(legend.position = "none") +
+  labs(title = "Cooccurrences within 3 words distance")
+```
+
+####2.1.3: The most pleasant product
+
+I actually encountered some problems when I dealing with this specific request since words associated with products are hard to extracted. In order to resolve this problem, I extracted those words within in three words distance from ¡°buy¡± and ¡°purchase¡±(lemma had applied to dataset, so from the table below, we can see that freqencies of "bought" and "purchased" are 0).
+
+As a result, I found out that ¡°Car¡± is the most mentioned product in these happy moments. This is quite interesting. Originally, I thought some kind of food or electrical products should be the answer. So does this mean that maybe we can make some long-term investment in cars industry? Probably further exploration of bigger database can give us more insights on this.
+ 
+
+```{r}
+stats2 = subset(x, upos %in% "VERB")
+stats2 = txt_freq(x = stats2$lemma)
+bap=rbind(stats2[stats2$key=="buy",],stats2[stats2$key=="purchase",],stats2$key=="purchased",stats2$key=="bought")
+bap
+```
+
+```{r}
+m=as.matrix(x$lemma)
+mnewb1=matrix(data=NA,nrow = 211101,ncol = 1)
+mnewb2=matrix(data=NA,nrow = 211101,ncol = 1)
+mnewb3=matrix(data=NA,nrow = 211101,ncol = 1)
+mnewp1=matrix(data=NA,nrow = 211101,ncol = 1)
+mnewp2=matrix(data=NA,nrow = 211101,ncol = 1)
+mnewp3=matrix(data=NA,nrow = 211101,ncol = 1)
+n=seq(1,211101,length=211101)
+for (i in n) {
+  if(m[i,]=="buy"){
+    mnewb1[i,]=m[i+1,]
+    mnewb2[i,]=m[i+2,]
+    mnewb3[i,]=m[i+3,]
+  }
+}
+for (i in n) {
+  if(m[i,]=="purchase"){
+    mnewp1[i,]=m[i+1,]
+    mnewp2[i,]=m[i+2,]
+    mnewp3[i,]=m[i+3,]
+  }
+}
+threewordsafterbp=as.character(rbind(mnewb1=na.omit(mnewb1),mnewb2=na.omit(mnewb2),mnewb3=na.omit(mnewb3),mnewp1=na.omit(mnewb1),mnewp2=na.omit(mnewb2),mnewp3=na.omit(mnewb3)))
+products<-Corpus(VectorSource(threewordsafterbp))
+products<-tm_map(products, stripWhitespace)
+products<-tm_map(products, content_transformer(tolower))
+products<-tm_map(products, removeWords, stopwords("english"))
+products<-tm_map(products, removeWords, c("i", "we","us","them","her","him","day","went","today","made","saw","does","did","somthing","parts","realize","reflect","true","false","found","lot","thing","ing","still","get","veri","the","seen","no","playing","without","and","was","for","with","that","had","happy","when","and","they","have","make","got","see","yesterday","she","he","me","a","an","new","good","nice","one","favourite","new","able","really","finally"))
+products<-tm_map(products, removeWords, character(0))
+products<-tm_map(products, removePunctuation)
+tdm.all<-TermDocumentMatrix(products)
+tdm.tidy=tidy(tdm.all)
+tdm.overall=summarise(group_by(tdm.tidy, term), sum(count))
+wordcloud(tdm.overall$term, tdm.overall$`sum(count)`,
+          scale=c(3,0.2),
+          max.words=100,
+          min.freq=1,
+          random.order=FALSE,
+          rot.per=0.3,
+          use.r.layout=T,
+          random.color=FALSE,
+          colors=brewer.pal(9,"Purples"))
+# In this chunk code, I mainly extract words which are within 3 words distance form "Buy" and "Purchase". Since lemma has been applied to the whole data set, we don't need to worried about "bought" or"purchasd."  
+
+```
+
+
+###3, Different features of data among different kind of persons and a logistic regression classifier for gender
+
+```{r}
+demographic=read.csv("C:/Users/Alienware/Desktop/demographic.csv")
+
+```
+
+```{r}
+demonew=merge(x=demographic,y=cleanedhm,on="wid")
+#gender=c("male","female")
+#totalnumber=c(sum(ifelse(demonew$gender=="m",1,0)),sum(ifelse(demonew$gender=="f",1,0)))
+#mydata=data.frame(gender,totalnumber)
+#ggplot(data=mydata,aes(gender,totalnumber))+geom_bar(stat = "identity",fill="darkorchid3",width = 0.3)
+#totalmale=sum(ifelse(demonew$gender=="m",1,0))
+
+#totalfemale=sum(ifelse(demonew$gender=="f",1,0))
+
+```
+
+```{r}
+transformation=ifelse(demonew$gender=="m",1,0)
+newdata=cbind(demonew,transformation)
+newdata=cbind.data.frame(newdata$cleaned_hm,newdata$gender,newdata$transformation)
+colnames(newdata)=c("cleaned_hm","gender","gendercode")
+```
+
+####3.1: Male/Female
+
+firstly, let us look at the difference between males and females(Blue word cloud is stand for men while red one is stand for women). 
+
+Based on the plot, I found that women are more likely to feel happy when they are getting along with family members while friends, job, games are more likely to generate happiness for males. This is probably due to the difference in nature between men and women.
+
+
+```{r}
+dataofmale=newdata[which(newdata$gender=="m"),]
+dataofmale=as.character(dataofmale$cleaned_hm)
+dataoffemale=newdata[which(newdata$gender=="f"),]
+dataoffemale=as.character(dataoffemale$cleaned_hm)
+funp(text1 = dataofmale,c=brewer.pal(9,"Blues"))
+funp(text1=dataoffemale,c=brewer.pal(8,"YlOrRd"))
+```
+
+####3.2:Married/Single/Divorced 
+
+secondly, let us look at the difference between those people who are married, single or divorced.(Blue:married Red:single Green:divorced)
+
+Form the word clouds of these three different kinds of people, we can see that when people are single, words such as ¡°friends¡±,¡± job¡± and ¡°night¡± are highly mentioned in those happy moments sentence while words like ¡°daughter¡±, ¡±son ¡± are highly mentioned by those people who are married and divorced. At the same time, the main difference between married and divorced people is that, in fact, ¡°family¡±, ¡±husband¡±, ¡±wife¡± are only highly mentioned by married people. This result is quite rational for me since divorced people will still love and pay great attention to their kids in most instance. While it seems that their love towards their wife/husband has come to the end. 
+
+
+
+```{r}
+dataofm=demonew[which(demonew$marital =="married"),]
+dataofm=as.character(dataofm$cleaned_hm)
+dataofs=demonew[which(demonew$marital=="single"),]
+dataofs=as.character(dataofs$cleaned_hm)
+dataofd=demonew[which(demonew$marital =="divorced"),]
+dataofd=as.character(dataofd$cleaned_hm)
+funp(text1 = dataofm,c=brewer.pal(9,"Blues"))
+funp(text1=dataofs,c=brewer.pal(8,"YlOrRd"))
+funp(text1=dataofd,c=brewer.pal(8,"BuGn"))
+```
+
+
+After I found the difference between males and females, there is an idea immediately come across my mind. ¡°Can we actually use the words or sentences said by a specific person and then distinguish their gender?¡± In order to achieve this, I use the logistic regression as my prediction model. 
+
+####3.3: logistic regression classifier for gender
+
+Before I start to set up the logistic regression model, I first have a glance at some general information. We can see that the records generated by the male are slightly higher than those generated by the female. And of course, we cannot find the third kind of general so I decided to apply a binomial model in my logistic regression model for this binary problem. I set up a vocabulary base. I used the first 70400(around 70%) data as my train group (70400X23738) and I use the rest of them as test group (30135X23738). And I found the result is just ok which is slightly above 50%( the probability of a random guess). In fact, we can further clean the database to increase the fit accuracy at the end. For example, we can clean out a word such as ¡±I¡±, ¡±we¡±¡­. which are less meaningful in this scenario.
+
+```{r}
+demonew=merge(x=demographic,y=cleanedhm,on="wid")
+gender=c("male","female")
+totalnumber=c(sum(ifelse(demonew$gender=="m",1,0)),sum(ifelse(demonew$gender=="f",1,0)))
+mydata=data.frame(gender,totalnumber)
+ggplot(data=mydata,aes(gender,totalnumber))+geom_bar(stat = "identity",fill="darkorchid3",width = 0.3)
+totalmale=sum(ifelse(demonew$gender=="m",1,0))
+
+totalfemale=sum(ifelse(demonew$gender=="f",1,0))
+```
+
+
+
+
+
+```{r}
+newdata2=as.data.frame( cbind(seq(1,100535,length=100535),as.character(newdata$cleaned_hm)))
+colnames(newdata2)=c("id","cleaned_hm")
+setDT(newdata2)
+setkey(newdata2, id)
+set.seed(2017L)
+all_ids = newdata2$id
+train_ids = sample(all_ids, 70400)
+test_ids = setdiff(all_ids, train_ids)
+train = newdata2[J(train_ids)]
+test = newdata2[J(test_ids)]
+
+```
+
+```{r}
+prep_fun = tolower
+tok_fun = word_tokenizer
+
+it_train = itoken(as.character(train$cleaned_hm), 
+             preprocessor = prep_fun, 
+             tokenizer = tok_fun, 
+              
+             progressbar = FALSE)
+vocab = create_vocabulary(it_train)
+```
+
+The dimension of my train set:
+
+```{r}
+vectorizer = vocab_vectorizer(vocab)
+dtm_train = create_dtm(it_train, vectorizer)
+dim(dtm_train)
+ 
+
+```
+
+The dimension of my test set:
+
+```{r}
+it_test = itoken(as.character(test$cleaned_hm), 
+             preprocessor = prep_fun, 
+             tokenizer = tok_fun, 
+             ids =test$id,  
+             progressbar = FALSE)
+#vocabt = create_vocabulary(it_test)
+#vectorizer = vocab_vectorizer(vocabt)
+dtm_test = create_dtm(it_test, vectorizer)
+dim(dtm_test)
+```
+
+```{r}
+set.seed(1)
+NFOLDS =8
+hh=newdata[1:70400,]
+hh=hh$gendercode
+glmnet_classifier = cv.glmnet(x = dtm_train, y = hh,family = 'binomial', alpha = 1,type.measure = "auc",nfolds = NFOLDS,thresh = 1e-3,maxit = 1e3)
+# glmnet function help us to fit out the logistic regression
+
+```
+
+
+Final fit value of test to train:
+
+```{r}
+xx=newdata[70401:100535,]
+xx=xx$gendercode
+#glmnet_classifier2 = cv.glmnet(x = dtm_test, y = xx,family = 'binomial', alpha = 1,type.measure = "auc",nfolds = NFOLDS,thresh = 1e-3,maxit = 1e3)
+#preds = predict(glmnet_classifier, dtm_test)
+preds = predict(glmnet_classifier, dtm_test, type = 'response')[,1]
+glmnet:::auc(xx, preds)
+# Here we compare the area under curve(auc) to generate the fit value 
+```
+###4, Conclusion
+(1):
+The time we spent with our friends is mostly like the reason why we feel happy. However, happiness is a combination of different factors, by which it means that a happy scenario is composed of people, event or some related things.
+
+(2): 
+Surprisingly, Cars are actually the happiest product 
+
+(3):
+Not so surprisingly, Summer is the happiest season 
+
+(4):
+There are some differences between happy moments of different kinds of people. When you are married or divorced, you will feel happy when you get along with your children while at the same time if you are a male, you will probably feel happier when you get along with your friends or something good happens in your workplace.  
+
+(5):
+To some extent, we can actually distinguish men and women by the words in a sentence.
+And with further research, we can probably distinguish some specific features of different people by analyze what they say.  
+
